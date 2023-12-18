@@ -1,4 +1,5 @@
 cmake -S . ^
+-G "Visual Studio 16 2019" ^
 -B .build/windows.x86_64 ^
 -A x64 ^
 -DPROJECT_ARCH=x86_64 ^

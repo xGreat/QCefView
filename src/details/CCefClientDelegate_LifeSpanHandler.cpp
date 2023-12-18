@@ -40,7 +40,10 @@ CCefClientDelegate::onBeforePopup(CefRefPtr<CefBrowser>& browser,
   QCefSetting s;
   QCefSettingPrivate::CopyFromCefBrowserSettings(&s, &settings);
 
-  if (targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_POPUP) {
+  if (targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_FOREGROUND_TAB ||
+      targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_BACKGROUND_TAB ||
+      targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_POPUP ||
+      targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_WINDOW) {
     // the new browser was created from javascript, we need to conform the CEF pop-up browser lifecycle
     // because CEF need to return the new browser identity to javascript context
     Qt::ConnectionType c = pCefViewPrivate_->q_ptr->thread() == QThread::currentThread() ? Qt::DirectConnection
@@ -113,6 +116,31 @@ CCefClientDelegate::onAfterCreate(CefRefPtr<CefBrowser>& browser)
   }
 
   if (browser->IsPopup()) {
+#ifdef Q_OS_WIN
+    CefRefPtr<CefBrowserHost> host = browser->GetHost();
+    if (host) {
+      // ShowWindow(host->GetWindowHandle(), SW_MAXIMIZE);
+      SetForegroundWindow(host->GetWindowHandle());
+
+      HICON hIcon1 = static_cast<HICON>(LoadImage(GetModuleHandle(NULL),
+                                                 TEXT("logo.ico"), // Path to your icon file or resource ID
+                                                 IMAGE_ICON,
+                                                 GetSystemMetrics(SM_CXICON),
+                                                 GetSystemMetrics(SM_CYICON),
+                                                 LR_LOADFROMFILE | LR_DEFAULTSIZE));
+
+      HICON hIcon = (HICON)LoadImage(NULL, L"logo.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+      if (!hIcon) {
+        hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(101));
+        // DestroyIcon(hIcon);
+      }
+
+      if (hIcon) {
+        SendMessage(host->GetWindowHandle(), WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+        SendMessage(host->GetWindowHandle(), WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+      }
+    }
+#endif
     // pop-up window
     QMetaObject::invokeMethod(
       pCefViewPrivate_, [=]() { pCefViewPrivate_->onAfterCefPopupCreated(browser); }, c);
