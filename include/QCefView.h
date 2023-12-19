@@ -396,6 +396,8 @@ signals:
   /// <param name="window">The native browser windows</param>
   void nativeBrowserCreated(QWindow* window);
 
+  void popupBrowserCreated(QWindow* window);
+
 protected:
   /// <summary>
   /// Gets called before a new browser created (only for browser created by non-JavaScript)

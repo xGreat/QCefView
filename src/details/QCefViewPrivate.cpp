@@ -13,6 +13,7 @@
 #include <QInputMethodQueryEvent>
 #include <QPainter>
 #include <QWindow>
+#include <QThread>
 #pragma endregion qt_headers
 
 #pragma region cef_headers
@@ -310,6 +311,56 @@ QCefViewPrivate::onBeforeNewPopupCreate(qint64 sourceFrameId,
 void
 QCefViewPrivate::onAfterCefPopupCreated(CefRefPtr<CefBrowser> browser)
 {
+  Q_Q(QCefView);
+
+#ifdef Q_OS_WIN
+  CefRefPtr<CefBrowserHost> host = browser->GetHost();
+  if (host) {
+    // ShowWindow(host->GetWindowHandle(), SW_MAXIMIZE);
+    SetForegroundWindow(host->GetWindowHandle());
+
+    HICON hIcon1 = static_cast<HICON>(LoadImage(GetModuleHandle(NULL),
+                                                TEXT("logo.ico"), // Path to your icon file or resource ID
+                                                IMAGE_ICON,
+                                                GetSystemMetrics(SM_CXICON),
+                                                GetSystemMetrics(SM_CYICON),
+                                                LR_LOADFROMFILE | LR_DEFAULTSIZE));
+
+    HICON hIcon = (HICON)LoadImage(NULL, L"logo.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
+    if (!hIcon) {
+      hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(101));
+      // DestroyIcon(hIcon);
+    }
+
+    if (hIcon) {
+      SendMessage(host->GetWindowHandle(), WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
+      SendMessage(host->GetWindowHandle(), WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
+    }
+  }
+#endif
+
+  QWindow* window = QWindow::fromWinId((WId)(browser->GetHost()->GetWindowHandle()));
+
+  Qt::ConnectionType c = Qt::DirectConnection;
+  if (q->thread() != QThread::currentThread()) {
+    // change connection type
+    if (!isOSRModeEnabled()) {
+      // NCW mode
+      c = Qt::QueuedConnection;
+    } else {
+      // OSR mode
+      c = Qt::BlockingQueuedConnection;
+    }
+
+    // move window to main thread
+    if (window != nullptr) {
+      window->moveToThread(q->thread());
+    }
+  }
+
+  window->setVisible(false);
+  // emit signal
+  emit q->popupBrowserCreated(window);
 }
 
 void
